@@ -1,4 +1,4 @@
-Django==5.0
+Django
 openai==1.35.10
 python-dotenv==1.0.1
 pytube==15.0.0
