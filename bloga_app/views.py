@@ -8,6 +8,7 @@ import openai
 import os
 from django.conf import settings
 from dotenv import load_dotenv
+import time
 
 
 # Load environment variables from a .env file
@@ -49,6 +50,8 @@ def blog_creation(request):
             return JsonResponse({
                 'error': 'Couldn\'t generate the blog'
             }, status=407)
+        
+        return JsonResponse({'content': final_work})
 
     else:
         return JsonResponse({
@@ -56,18 +59,19 @@ def blog_creation(request):
             },
             status=408)
 
+
 def ttl_ytb(link):
-    source = YouTube(link)
-    ttl = source.title
+    yt = YouTube(link)
+    ttl = yt.title
     return ttl
 
 def get_audio(link):
-    source = YouTube(link)
+    yt = YouTube(link)
 
-    mp4 = source.streams.filter(only_audio=True).first()
+    video = yt.streams.filter(only_audio=True).first()
     audio = video.download(output_path=settings.MEDIA_ROOT)
-    bs, extension = os.path.splittext(audio)
-    created_file = bs + '.mp3'
+    base, ext = os.path.splitext(audio)
+    created_file = base + '.mp3'
     os.rename = (audio, created_file)
 
     return created_file
@@ -91,12 +95,24 @@ def write_blog(ytb_text):
                 but let it vary differently from a YouTube video. Make
                 it look like a blog article New York Times will appreciate"""
     
-    answer = openai.Completion.create(
-        model="text-davinci-003",
-        prompt=ai_prompt,
-        max_tokens=2000
-    )
+    retry_attempts = 5
+    for attempt in range(retry_attempts):
+        try:
+            answer = openai.Completion.create(
+                model="text-davinci-003",
+                prompt=ai_prompt,
+                max_tokens=1000
+            )
 
-    final_work = answer.choices[0].text.strip()
+            final_work = answer.choices[0].text.strip()
 
-    return final_work
+            return final_work
+        except openai.error.RateLimitError:
+            if attempt < retry_attempts - 1:
+                sleep_time = 2 ** attempt
+                print(f"Rate limit exceeded. Retrying in {sleep_time} seconds...")
+                time.sleep(sleep_time)
+            else:
+                print("Rate limit exceeded. No more retries.")
+                
+                return None
